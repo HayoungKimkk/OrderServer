@@ -20,12 +20,9 @@ public class Casher {// main class
 	private static Socket socket;
 
 	public static void main(String args[]) {// main method
-		new Casher().start();
+		Casher casher = new Casher();
+		casher.start();
 	}// main end
-
-	public void Cahser() {// Class method
-		clientsName = new ArrayList<String>();
-	}// Class method end
 
 	public static void sendMsg(String str) {//sendMsg method
 		DataOutputStream dos;
@@ -50,13 +47,6 @@ public class Casher {// main class
 			serverSocket = new ServerSocket(7002);
 			System.out.println("Server is ready");
 
-			String menu = new String();
-			List<String> menuList = new ArrayList<String>();// add menu list
-
-			menuList.add("Shake");
-			menuList.add("Icecream");
-			menuList.add("quit");
-
 			int i = 0;
 
 			while (i < 2) {// loop till connected
@@ -66,6 +56,13 @@ public class Casher {// main class
 				System.out.println("Connected from [" + socket.getInetAddress() + ":" + socket.getPort() + "]");
 				i++;
 			}
+			
+			String menu = new String();
+			List<String> menuList = new ArrayList<String>();// add menu list
+
+			menuList.add("Shake");
+			menuList.add("Icecream");
+			menuList.add("quit");
 
 			while (!menu.equals("2")) {
 				System.out.println("//Menu//");
