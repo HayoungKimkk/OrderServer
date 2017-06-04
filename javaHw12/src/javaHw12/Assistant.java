@@ -39,6 +39,7 @@ public class Assistant {
 							System.out.println("[Casher]: " + "주문 번호: " + orderNumber + " 메뉴: " + str + " 받았습니다");
 							orderNumber++;
 
+							System.out.println("주문하신 " + str + " 완료되었습니다.");
 							dos.writeUTF("주문하신 " + str + " 완료되었습니다.");
 						}
 							break;
