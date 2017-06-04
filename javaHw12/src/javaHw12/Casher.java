@@ -1,35 +1,97 @@
 package javaHw12;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Casher {// main class
+public class Casher extends Thread {
 
-	ArrayList<String> clientsName;// declare client array name
-	BufferedReader br;
-	private static Socket socket;
+	private static ServerSocket serverSocket;
 
-	public static void main(String args[]) {// main method
-		Casher casher = new Casher();
+	static List<Socket> socketList = new ArrayList<Socket>();
+	static DataOutputStream dosServer = null;
+
+	public Casher(int port) {
+		try {
+			serverSocket = new ServerSocket(port);
+			serverSocket.setSoTimeout(0);
+		} catch (SocketException e) {
+			System.out.println("[s] 타임아웃 설정 실패");
+		} catch (IOException e) {
+			System.out.println("[s] 소켓 생성 실패");
+		}
+	}
+
+	public static void main(String[] args) {
+
+		int port = Integer.parseInt(args[0]);
+
+		Casher casher = new Casher(port);
+		casher.setDaemon(true);
 		casher.start();
-	}// main end
 
-	public static void sendMsg(String str) {//sendMsg method
-		DataOutputStream dos;
+		List<String> menuList = new ArrayList<String>();
+
+		menuList.add("Shake");
+		menuList.add("Icecream");
+		menuList.add("Exit");
+
+		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+		String menu = new String();
+
+		while (!menu.equals("2")) // == 종료 신호
+		{
+			System.out.println("//Menu//");
+
+			// print a menulist
+			int idx = 0;
+			for (String s : menuList) {
+				System.out.println(idx++ + ": " + s);
+			}
+
+			System.out.print("주문하실 메뉴의 번호를 입력하세요: ");
 
 			try {
-				socket = new Socket();
-				dos = new DataOutputStream(socket.getOutputStream());
+				menu = br.readLine();
+			} catch (IOException e) {
+
+			}
+
+			switch (menu) {
+			case "0": // Shake
+			case "1": // Icecream
+			case "2": // Exit
+			{
+				int idxMenu = Integer.parseInt(menu);
+				sendMsg(menuList.get(idxMenu));
+			}
+				break;
+
+			default:
+				System.out.println("없는 메뉴 입니다.!");
+				break;
+			}
+
+			System.out.println("///////////////");
+
+		}
+
+		// 클라이언트 소켓 접속 대기....
+
+		System.out.println("시스템이 종료됩니다.");
+	}
+
+	public static void sendMsg(String str) {
+		for (Socket s : socketList) {
+			try {
+				DataOutputStream dos = new DataOutputStream(s.getOutputStream());
 
 				dos.writeUTF(str);
 				dos.flush();
@@ -37,96 +99,83 @@ public class Casher {// main class
 				System.out.println("Send Error");
 				e.printStackTrace();
 			}
+		}
 	}
 
-	public void start() {// start method
-		ServerSocket serverSocket = null;
-		Socket socket = null;
+	@Override
+	public void run() {
+		int clientNumber = 0;
 
-		try {// try-catch
-			serverSocket = new ServerSocket(7002);
-			System.out.println("Server is ready");
+		while (true) {
+			try {
+				System.out.println("[Casher] " + serverSocket.getLocalPort() + " 포트로 접속 기다리는 중...");
 
-			int i = 0;
+				Socket socket = serverSocket.accept();
 
-			while (i < 2) {// loop till connected
-				System.out.println("waiting...");
-				socket = serverSocket.accept();
+				System.out.println("[S] " + (clientNumber + 1) + "번째로  " + socket.getRemoteSocketAddress() + "에서 연결함");
 
-				System.out.println("Connected from [" + socket.getInetAddress() + ":" + socket.getPort() + "]");
-				i++;
-			}
-			
-			String menu = new String();
-			List<String> menuList = new ArrayList<String>();// add menu list
+				DataInputStream dis = new DataInputStream(socket.getInputStream());
+				DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
-			menuList.add("Shake");
-			menuList.add("Icecream");
-			menuList.add("quit");
+				socketList.add(clientNumber, socket);
 
-			while (!menu.equals("2")) {
-				System.out.println("//Menu//");
+				Thread echoThread = new Thread() {
+					@Override
+					public void run() {
+						// Server, Assistant 판단
+						String strProgram = null;
+						while (strProgram == null) {
+							try {
+								strProgram = dis.readUTF();
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
 
-				int idx = 0;
-				for (String s : menuList) {
-					System.out.println(idx++ + ": " + s);
-				}
+						switch (strProgram) {
+						case "Server":
+							dosServer = dos;
+							break;
 
-				System.out.print("주문하실 메뉴의 번호를 입력하세요: ");
+						case "Assistant":
+							String strRecvMsg = new String("");
+							while (!strRecvMsg.equals("Exit")) {
+								try {
+									strRecvMsg = dis.readUTF();
+									if (strRecvMsg == null)
+										continue;
 
-				menu = br.readLine();
+									switch (strRecvMsg) {
+									case "Exit":
+										break;
 
-				switch (menu) {
-				case "0":
-				case "1":
-				case "2": {
-					int nIdx = Integer.parseInt(menu);
-					sendMsg(menuList.get(nIdx));
-					break;
-				}
-				default:
-					System.out.println("없는 메뉴 입니다.!");
-					break;
-				}
+									default:
+										if (dosServer != null) {
+											dosServer.writeUTF("[Assistant]: " + strRecvMsg);
+										}
+										break;
+									}
+								} catch (IOException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+									break;
+								}
+							}
 
-				System.out.println("");
-				System.out.println("");
-				System.out.println("");
-			}
+							break;
+						}
+					}
+				};
 
-		} catch (Exception e) {// catch exception
-			e.printStackTrace();
-		}
-	}// start end
-
-	class EchoServer extends Thread {// inner class declare
-		Socket socket;
-		InputStream in;
-		OutputStream out;
-		PrintWriter pw;
-		String receiveMsg;
-
-		EchoServer(Socket socket) {// Echo Server
-			this.socket = socket;
-
-			try {// input, output declare
-				in = socket.getInputStream();
-				out = socket.getOutputStream();
-				pw = new PrintWriter(new OutputStreamWriter(out));
-				br = new BufferedReader(new InputStreamReader(in));
-
-				while ((receiveMsg = br.readLine()) != null) {
-					System.out.println("Assistante: " + receiveMsg);
-					pw.println(receiveMsg);
-					pw.flush();
-				}
-				pw.close();
-				br.close();
-				socket.close();
-			} catch (Exception e) {
+				echoThread.setDaemon(true);
+				echoThread.start();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-		}// receiver
 
-	}// inner class end
-}// main class end
+			clientNumber++;
+		}
+	}
+
+}
